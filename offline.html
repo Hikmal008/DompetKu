@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0d1117" />
+  <title>DompetKu — Offline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: rgba(255,255,255,0.07);
+      --gold: #f5c842;
+      --text: #e6edf3;
+      --muted: #8b949e;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 50% at 50% 50%, rgba(245, 200, 66, 0.04) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 48px 40px;
+      max-width: 440px;
+      width: 100%;
+      position: relative;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 40px; right: 40px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    }
+
+    .icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      filter: grayscale(0.3);
+    }
+
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.8rem;
+      color: var(--gold);
+      margin-bottom: 12px;
+    }
+
+    p {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.7;
+      margin-bottom: 8px;
+    }
+
+    .tip {
+      background: rgba(245, 200, 66, 0.06);
+      border: 1px solid rgba(245, 200, 66, 0.15);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin: 24px 0;
+      font-size: 0.875rem;
+      color: rgba(245, 200, 66, 0.8);
+      text-align: left;
+    }
+
+    .tip strong { display: block; margin-bottom: 4px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #f5c842, #c9a227);
+      color: #0d1117;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 20px rgba(245, 200, 66, 0.3);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 24px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #f07070;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    @media (max-width: 480px) {
+      .card { padding: 32px 20px; }
+      h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📡</div>
+    <h1>Sedang Offline</h1>
+    <p>Koneksi internet tidak tersedia saat ini.</p>
+    <p>Tetapi jangan khawatir — data pengeluaran Anda tetap aman tersimpan di perangkat.</p>
+
+    <div class="tip">
+      <strong>💡 Mode Offline Aktif</strong>
+      Data yang Anda input akan disimpan di perangkat dan otomatis disinkronkan ke Google Sheets saat koneksi internet kembali tersedia.
+    </div>
+
+    <a href="/" class="btn">
+      ← Kembali ke Aplikasi
+    </a>
+
+    <div class="status">
+      <div class="dot" id="status-dot"></div>
+      <span id="status-text">Menunggu koneksi internet...</span>
+    </div>
+  </div>
+
+  <script>
+    // Auto-redirect when online
+    window.addEventListener('online', () => {
+      document.getElementById('status-dot').style.background = '#4bca81';
+      document.getElementById('status-text').textContent = 'Koneksi tersedia! Mengalihkan...';
+      setTimeout(() => { window.location.href = '/'; }, 1500);
+    });
+
+    // Check connection periodically
+    setInterval(async () => {
+      try {
+        await fetch('/?check=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
+        window.location.href = '/';
+      } catch {}
+    }, 10000);
+  </script>
+</body>
+</html>
