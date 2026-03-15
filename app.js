@@ -9,21 +9,14 @@
 const DB_NAME    = 'dompetku-db';
 const DB_VERSION = 1;
 const STORE_NAME = 'expenses';
-<<<<<<< HEAD
-const CFG_KEY    = 'dompetku-config';
-const MONTHS_ID  = ['Januari','Februari','Maret','April','Mei','Juni',
-                    'Juli','Agustus','September','Oktober','November','Desember'];
-
-=======
 const MONTHS_ID  = ['Januari','Februari','Maret','April','Mei','Juni',
                     'Juli','Agustus','September','Oktober','November','Desember'];
 
 // ── Google Apps Script URL ─────────────────────────────
 // Ganti nilai berikut dengan URL Web App dari Google Apps Script Anda.
 // Cara mendapatkannya: Deploy → New Deployment → Web App → Copy URL
-const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwBzpnA6cFVF5pukQ9GVTS6XPRwjs19MwupEqp8AC-1GDkuBw2P_UgDEAUJiG0h9parOQ/exec';
+const SHEETS_URL = 'GANTI_DENGAN_URL_APPS_SCRIPT_ANDA';
 
->>>>>>> 58de978 (Erase sheet UI)
 // ─── STATE ────────────────────────────────────────────
 let db;
 let expenses         = [];
@@ -50,11 +43,6 @@ const installBtn     = document.getElementById('install-btn');
 const notifBtn       = document.getElementById('notif-btn');
 const syncBtn        = document.getElementById('sync-btn');
 const exportCsvBtn   = document.getElementById('export-csv-btn');
-<<<<<<< HEAD
-const saveConfigBtn  = document.getElementById('save-config-btn');
-const sheetsUrl      = document.getElementById('sheets-url');
-=======
->>>>>>> 58de978 (Erase sheet UI)
 const modalOverlay   = document.getElementById('modal-overlay');
 const modalConfirm   = document.getElementById('modal-confirm');
 const modalCancel    = document.getElementById('modal-cancel');
@@ -64,10 +52,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   setDefaultDate();
   await initDB();
   await loadExpenses();
-<<<<<<< HEAD
-  loadConfig();
-=======
->>>>>>> 58de978 (Erase sheet UI)
   registerServiceWorker();
   setupOnlineOffline();
   setupInstallPrompt();
@@ -285,11 +269,7 @@ form.addEventListener('submit', async (e) => {
     showToast(`✅ Pengeluaran "${expense.name}" berhasil ditambahkan!`, 'success');
 
     // Auto-sync if online and URL configured
-<<<<<<< HEAD
-    if (navigator.onLine && getConfig().sheetsUrl) {
-=======
     if (navigator.onLine && SHEETS_URL && !SHEETS_URL.startsWith('GANTI')) {
->>>>>>> 58de978 (Erase sheet UI)
       syncToSheets([expense]);
     }
   } catch (err) {
@@ -342,14 +322,8 @@ syncBtn.addEventListener('click', async () => {
     showToast('✨ Semua data sudah tersinkron!', 'info');
     return;
   }
-<<<<<<< HEAD
-  if (!getConfig().sheetsUrl) {
-    showToast('⚠️ Konfigurasi URL Google Sheets terlebih dahulu.', 'error');
-    document.querySelector('.sheets-config').open = true;
-=======
   if (!SHEETS_URL || SHEETS_URL.startsWith('GANTI')) {
     showToast('⚠️ URL Google Sheets belum dikonfigurasi di app.js.', 'error');
->>>>>>> 58de978 (Erase sheet UI)
     return;
   }
   if (!navigator.onLine) {
@@ -360,12 +334,7 @@ syncBtn.addEventListener('click', async () => {
 });
 
 async function syncToSheets(items) {
-<<<<<<< HEAD
-  const cfg = getConfig();
-  if (!cfg.sheetsUrl) return;
-=======
   if (!SHEETS_URL || SHEETS_URL.startsWith('GANTI')) return;
->>>>>>> 58de978 (Erase sheet UI)
 
   syncBanner.classList.remove('hidden');
   let successCount = 0;
@@ -380,16 +349,6 @@ async function syncToSheets(items) {
         notes:    item.notes || ''
       };
 
-<<<<<<< HEAD
-      const res = await fetch(cfg.sheetsUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      // With mode:'no-cors' we can't read response, so we assume success
-=======
       await fetch(SHEETS_URL, {
         method: 'POST',
         mode:   'no-cors',
@@ -398,7 +357,6 @@ async function syncToSheets(items) {
       });
 
       // mode:'no-cors' → response tidak bisa dibaca, asumsikan sukses
->>>>>>> 58de978 (Erase sheet UI)
       await markExpenseSynced(item.id);
       item.synced = true;
       successCount++;
@@ -413,43 +371,10 @@ async function syncToSheets(items) {
   if (successCount > 0) {
     showToast(`☁️ ${successCount} data berhasil disinkronkan ke Google Sheets!`, 'success');
   } else {
-<<<<<<< HEAD
-    showToast('❌ Gagal menyinkronkan. Periksa URL Google Sheets.', 'error');
-  }
-}
-
-// ─── CONFIG ───────────────────────────────────────────
-function getConfig() {
-  try {
-    return JSON.parse(localStorage.getItem(CFG_KEY)) || {};
-  } catch { return {}; }
-}
-
-function saveConfig(cfg) {
-  localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
-}
-
-function loadConfig() {
-  const cfg = getConfig();
-  if (cfg.sheetsUrl) sheetsUrl.value = cfg.sheetsUrl;
-}
-
-saveConfigBtn.addEventListener('click', () => {
-  const url = sheetsUrl.value.trim();
-  if (url && !url.startsWith('https://script.google.com/')) {
-    showToast('⚠️ URL harus berupa Google Apps Script URL.', 'error');
-    return;
-  }
-  saveConfig({ sheetsUrl: url });
-  showToast('✅ Konfigurasi Google Sheets disimpan!', 'success');
-});
-
-=======
     showToast('❌ Gagal menyinkronkan. Periksa koneksi internet.', 'error');
   }
 }
 
->>>>>>> 58de978 (Erase sheet UI)
 // ─── EXPORT CSV ───────────────────────────────────────
 exportCsvBtn.addEventListener('click', () => {
   if (filteredExpenses.length === 0) {
@@ -580,11 +505,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'SYNC_PENDING') {
         const unsynced = expenses.filter(e => !e.synced);
-<<<<<<< HEAD
-        if (unsynced.length > 0 && getConfig().sheetsUrl) {
-=======
         if (unsynced.length > 0 && SHEETS_URL && !SHEETS_URL.startsWith('GANTI')) {
->>>>>>> 58de978 (Erase sheet UI)
           syncToSheets(unsynced);
         }
       }
@@ -601,11 +522,7 @@ function setupOnlineOffline() {
       offlineBanner.classList.add('hidden');
       // Auto-sync on reconnect
       const unsynced = expenses.filter(e => !e.synced);
-<<<<<<< HEAD
-      if (unsynced.length > 0 && getConfig().sheetsUrl) {
-=======
       if (unsynced.length > 0 && SHEETS_URL && !SHEETS_URL.startsWith('GANTI')) {
->>>>>>> 58de978 (Erase sheet UI)
         setTimeout(() => syncToSheets(unsynced), 1500);
       }
     }
@@ -673,8 +590,4 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 58de978 (Erase sheet UI)
