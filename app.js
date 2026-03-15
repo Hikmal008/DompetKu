@@ -28,7 +28,7 @@ const MONTHS_ID = [
 // Ganti nilai berikut dengan URL Web App dari Google Apps Script Anda.
 // Cara mendapatkannya: Deploy → New Deployment → Web App → Copy URL
 const SHEETS_URL =
-  "https://script.google.com/macros/s/AKfycbxBRIpuq_Zpz-pk2IOqc1Ik7AxK0_FfGUVgJoY1cj3qMwSHxZAClZOYGK8gOJdir9IX9Q/exec";
+  "https://script.google.com/macros/s/AKfycbxs8sTZ8M4C-ohOc8wUpCu8JJQMvrLJH9MJ06STxfcQiWEeWyvGAiKPjhzGJrAAp9rE6A/exec";
 
 // ─── STATE ────────────────────────────────────────────
 let db;
