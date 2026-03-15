@@ -1,40 +1,43 @@
 /* =====================================================
    DompetKu — Google Apps Script Backend (Code.gs)
-   Endpoint: POST JSON → append row ke Google Sheets
 
-   CARA DEPLOY:
-   1. Buka https://script.google.com → New Project
-   2. Paste seluruh isi file ini, ganti SPREADSHEET_ID di bawah
-   3. Deploy → New Deployment → Web App
+   ADA DUA CARA PAKAI:
+   ─────────────────────────────────────────────────
+   A) Container-bound (CARA ANDA — lewat Ekstensi → Apps Script)
+      → Tidak perlu isi SPREADSHEET_ID, otomatis terhubung
+        ke spreadsheet tempat script ini dibuka.
+
+   B) Standalone (lewat script.google.com langsung)
+      → Isi SPREADSHEET_ID di bawah dengan ID spreadsheet Anda.
+
+   CARA DEPLOY (sama untuk keduanya):
+   1. Paste seluruh kode ini ke editor Apps Script
+   2. Deploy → New Deployment → Web App
       - Execute as : Me
       - Who has access : Anyone
-   4. Copy URL → paste ke konstanta SHEETS_URL di app.js
+   3. Copy URL → paste ke konstanta SHEETS_URL di app.js
    ===================================================== */
 
 // ── KONFIGURASI ────────────────────────────────────────
-// Isi SPREADSHEET_ID dengan ID spreadsheet Google Sheets Anda.
-// ID ada di URL: https://docs.google.com/spreadsheets/d/[SPREADSHEET_ID]/edit
-// Kosongkan ('') untuk membuat spreadsheet baru otomatis.
+// Jika script dibuka dari dalam Google Sheets (Ekstensi → Apps Script),
+// KOSONGKAN saja — script otomatis tahu spreadsheet mana yang dipakai.
 const SPREADSHEET_ID = '';
 
-// Nama sheet (tab) tempat data disimpan
+// Nama tab/sheet tempat data disimpan
 const SHEET_NAME = 'Pengeluaran';
 
 // ── HANDLE POST ────────────────────────────────────────
 function doPost(e) {
   try {
-    // Logging untuk debug (lihat di Apps Script → Executions)
     console.log('doPost received:', JSON.stringify(e));
 
-    // Parse body — bisa dari postData.contents (text/plain atau application/json)
-    let data;
     const raw = e.postData && e.postData.contents;
-
     if (!raw) {
       console.error('postData kosong. e =', JSON.stringify(e));
       return jsonResponse({ status: 'error', message: 'Body request kosong' });
     }
 
+    let data;
     try {
       data = JSON.parse(raw);
     } catch (parseErr) {
@@ -46,14 +49,12 @@ function doPost(e) {
     const required = ['date', 'name', 'category', 'amount'];
     for (const field of required) {
       if (data[field] === undefined || data[field] === null || data[field] === '') {
-        return jsonResponse({ status: 'error', message: `Field "${field}" wajib diisi` }, 400);
+        return jsonResponse({ status: 'error', message: 'Field "' + field + '" wajib diisi' });
       }
     }
 
-    // Ambil / buat sheet
     const sheet = getOrCreateSheet();
 
-    // Tambahkan baris data
     const timestamp = Utilities.formatDate(new Date(), 'Asia/Makassar', 'dd/MM/yyyy HH:mm:ss');
     sheet.appendRow([
       data.date,
@@ -64,96 +65,93 @@ function doPost(e) {
       timestamp
     ]);
 
-    return jsonResponse({ status: 'ok', message: 'Data berhasil disimpan', timestamp });
+    console.log('Row appended OK:', data.name, data.amount);
+    return jsonResponse({ status: 'ok', message: 'Data berhasil disimpan', timestamp: timestamp });
 
   } catch (err) {
-    console.error('doPost error:', err);
-    return jsonResponse({ status: 'error', message: err.message }, 500);
+    console.error('doPost error:', err.message);
+    return jsonResponse({ status: 'error', message: err.message });
   }
 }
 
-// ── HANDLE GET (opsional: ambil semua data) ────────────
+// ── HANDLE GET ─────────────────────────────────────────
 function doGet(e) {
   try {
     const action = e && e.parameter && e.parameter.action;
 
-    // Health check
     if (action === 'ping') {
-      return jsonResponse({ status: 'ok', message: 'DompetKu API aktif 🟢' });
+      return jsonResponse({ status: 'ok', message: 'DompetKu API aktif' });
     }
 
-    // Ambil semua data (untuk keperluan audit / backup)
     if (action === 'getData') {
       const sheet = getOrCreateSheet();
       const rows  = sheet.getDataRange().getValues();
-      if (rows.length <= 1) {
-        return jsonResponse({ status: 'ok', data: [] });
-      }
+      if (rows.length <= 1) return jsonResponse({ status: 'ok', data: [] });
       const headers = rows[0];
       const data    = rows.slice(1).map(row =>
         Object.fromEntries(headers.map((h, i) => [h, row[i]]))
       );
-      return jsonResponse({ status: 'ok', data });
+      return jsonResponse({ status: 'ok', data: data });
     }
 
-    // Default: info API
-    return jsonResponse({
-      status:  'ok',
-      message: 'DompetKu API — gunakan POST untuk mengirim data, ?action=ping untuk health check'
-    });
+    return jsonResponse({ status: 'ok', message: 'DompetKu API aktif. Gunakan POST untuk kirim data.' });
 
   } catch (err) {
-    return jsonResponse({ status: 'error', message: err.message }, 500);
+    return jsonResponse({ status: 'error', message: err.message });
   }
 }
 
-// ── HELPER: Ambil / Buat Spreadsheet & Sheet ──────────
+// ── HELPER: Ambil spreadsheet & sheet yang tepat ───────
 function getOrCreateSheet() {
   let spreadsheet;
 
-  if (SPREADSHEET_ID && SPREADSHEET_ID.trim() !== '') {
-    // Gunakan spreadsheet yang sudah ada
-    spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID.trim());
-  } else {
-    // Cek apakah sudah pernah dibuat (simpan ID di PropertiesService)
-    const props     = PropertiesService.getScriptProperties();
-    const savedId   = props.getProperty('DOMPETKU_SHEET_ID');
-
-    if (savedId) {
-      try {
-        spreadsheet = SpreadsheetApp.openById(savedId);
-      } catch (_) {
-        // File dihapus, buat baru
-        spreadsheet = null;
-      }
+  // Prioritas 1: Container-bound
+  // Script dibuka dari dalam Google Sheets (Ekstensi → Apps Script)
+  try {
+    const active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) {
+      spreadsheet = active;
+      console.log('Mode: Container-bound ->', spreadsheet.getName());
     }
+  } catch (_) {}
 
+  // Prioritas 2: Standalone dengan SPREADSHEET_ID diisi manual
+  if (!spreadsheet && SPREADSHEET_ID && SPREADSHEET_ID.trim() !== '') {
+    spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID.trim());
+    console.log('Mode: Standalone (openById) ->', spreadsheet.getName());
+  }
+
+  // Prioritas 3: Standalone tanpa ID — buat spreadsheet baru otomatis
+  if (!spreadsheet) {
+    const props   = PropertiesService.getScriptProperties();
+    const savedId = props.getProperty('DOMPETKU_SHEET_ID');
+    if (savedId) {
+      try { spreadsheet = SpreadsheetApp.openById(savedId); } catch (_) {}
+    }
     if (!spreadsheet) {
       spreadsheet = SpreadsheetApp.create('DompetKu — Pengeluaran');
       props.setProperty('DOMPETKU_SHEET_ID', spreadsheet.getId());
-      console.log('Spreadsheet baru dibuat: ' + spreadsheet.getUrl());
+      console.log('Spreadsheet baru dibuat:', spreadsheet.getUrl());
     }
   }
 
-  // Cari / buat sheet tab dengan nama SHEET_NAME
+  // Cari / buat tab dengan nama SHEET_NAME
   let sheet = spreadsheet.getSheetByName(SHEET_NAME);
   if (!sheet) {
     sheet = spreadsheet.insertSheet(SHEET_NAME);
     setupSheetHeader(sheet);
   } else if (sheet.getLastRow() === 0) {
-    // Sheet ada tapi kosong, pasang header
     setupSheetHeader(sheet);
   }
 
   return sheet;
 }
 
-// ── HELPER: Buat header baris pertama ─────────────────
+// ── HELPER: Setup header & formatting ─────────────────
 function setupSheetHeader(sheet) {
   const headers = ['Tanggal', 'Nama Pengeluaran', 'Kategori', 'Jumlah (Rp)', 'Catatan', 'Waktu Sync'];
   sheet.appendRow(headers);
 
-  // Styling header
   const headerRange = sheet.getRange(1, 1, 1, headers.length);
   headerRange
     .setBackground('#1c2128')
@@ -161,25 +159,37 @@ function setupSheetHeader(sheet) {
     .setFontWeight('bold')
     .setFontSize(11);
 
-  // Lebar kolom
-  sheet.setColumnWidth(1, 110); // Tanggal
-  sheet.setColumnWidth(2, 200); // Nama
-  sheet.setColumnWidth(3, 170); // Kategori
-  sheet.setColumnWidth(4, 120); // Jumlah
-  sheet.setColumnWidth(5, 200); // Catatan
-  sheet.setColumnWidth(6, 160); // Waktu Sync
-
-  // Freeze header row
+  sheet.setColumnWidth(1, 110);
+  sheet.setColumnWidth(2, 200);
+  sheet.setColumnWidth(3, 170);
+  sheet.setColumnWidth(4, 120);
+  sheet.setColumnWidth(5, 200);
+  sheet.setColumnWidth(6, 160);
   sheet.setFrozenRows(1);
 }
 
-// ── HELPER: Format JSON response ──────────────────────
-function jsonResponse(obj, statusCode) {
-  const output = ContentService
+// ── HELPER: JSON response ──────────────────────────────
+function jsonResponse(obj) {
+  return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
 
-  // Catatan: ContentService tidak mendukung custom status code secara native.
-  // Status code di sini hanya untuk dokumentasi internal — respons tetap 200.
-  return output;
+// ── FUNGSI TES MANUAL (jalankan ini dari editor, bukan doPost) ──
+function testDoPost() {
+  const fakeEvent = {
+    postData: {
+      contents: JSON.stringify({
+        date:     '2025-03-15',
+        name:     'Tes Makan Siang',
+        category: '🍽️ Makanan & Minuman',
+        amount:   25000,
+        notes:    'Tes dari editor Apps Script'
+      }),
+      type: 'text/plain'
+    }
+  };
+
+  const result = doPost(fakeEvent);
+  console.log('Hasil:', result.getContent());
 }
