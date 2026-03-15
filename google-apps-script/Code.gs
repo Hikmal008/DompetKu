@@ -23,12 +23,23 @@ const SHEET_NAME = 'Pengeluaran';
 // ── HANDLE POST ────────────────────────────────────────
 function doPost(e) {
   try {
-    // Parse body JSON
+    // Logging untuk debug (lihat di Apps Script → Executions)
+    console.log('doPost received:', JSON.stringify(e));
+
+    // Parse body — bisa dari postData.contents (text/plain atau application/json)
     let data;
+    const raw = e.postData && e.postData.contents;
+
+    if (!raw) {
+      console.error('postData kosong. e =', JSON.stringify(e));
+      return jsonResponse({ status: 'error', message: 'Body request kosong' });
+    }
+
     try {
-      data = JSON.parse(e.postData.contents);
+      data = JSON.parse(raw);
     } catch (parseErr) {
-      return jsonResponse({ status: 'error', message: 'Invalid JSON payload' }, 400);
+      console.error('Gagal parse JSON:', raw);
+      return jsonResponse({ status: 'error', message: 'Body bukan JSON valid: ' + raw });
     }
 
     // Validasi field wajib
