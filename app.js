@@ -28,7 +28,7 @@ const MONTHS_ID = [
 // Ganti nilai berikut dengan URL Web App dari Google Apps Script Anda.
 // Cara mendapatkannya: Deploy → New Deployment → Web App → Copy URL
 const SHEETS_URL =
-  "https://script.google.com/macros/s/AKfycbxs8sTZ8M4C-ohOc8wUpCu8JJQMvrLJH9MJ06STxfcQiWEeWyvGAiKPjhzGJrAAp9rE6A/exec";
+  "https://script.google.com/macros/s/AKfycbyRyWM7CVOehp_z7PZRjg1ALp2eVpgqSDXhUmldcC3AGEXGjnDRda9jMCatN1hjRZNn/exec";
 
 // ─── STATE ────────────────────────────────────────────
 let db;
@@ -367,11 +367,6 @@ filterMonth.addEventListener("change", () => {
 
 // ─── GOOGLE SHEETS SYNC ───────────────────────────────
 syncBtn.addEventListener("click", async () => {
-  const unsynced = expenses.filter((e) => !e.synced);
-  if (unsynced.length === 0) {
-    showToast("✨ Semua data sudah tersinkron!", "info");
-    return;
-  }
   if (!SHEETS_URL || SHEETS_URL.startsWith("GANTI")) {
     showToast("⚠️ URL Google Sheets belum dikonfigurasi di app.js.", "error");
     return;
@@ -383,6 +378,20 @@ syncBtn.addEventListener("click", async () => {
     );
     return;
   }
+  const unsynced = expenses.filter((e) => !e.synced);
+  if (unsynced.length === 0) {
+    // Semua sudah ditandai synced — tawarkan kirim ulang semua
+    const konfirmasi = confirm(
+      "Semua data sudah ditandai tersinkron.\n\n" +
+        "Jika data tidak muncul di Google Sheets, klik OK untuk reset dan kirim ulang semua data.",
+    );
+    if (konfirmasi) {
+      await resetAllSyncStatus();
+      const semua = expenses.filter((e) => !e.synced);
+      if (semua.length > 0) await syncToSheets(semua);
+    }
+    return;
+  }
   await syncToSheets(unsynced);
 });
 
@@ -391,6 +400,7 @@ async function syncToSheets(items) {
 
   syncBanner.classList.remove("hidden");
   let successCount = 0;
+  let failCount = 0;
 
   for (const item of items) {
     try {
@@ -402,21 +412,50 @@ async function syncToSheets(items) {
         notes: item.notes || "",
       };
 
-      // Content-Type harus 'text/plain' saat mode:'no-cors'
-      // Browser memblokir 'application/json' pada no-cors request
-      await fetch(SHEETS_URL, {
+      const res = await fetch(SHEETS_URL, {
         method: "POST",
-        mode: "no-cors",
+        mode: "cors",
         headers: { "Content-Type": "text/plain" },
         body: JSON.stringify(payload),
       });
 
-      // mode:'no-cors' → response tidak bisa dibaca, asumsikan sukses
-      await markExpenseSynced(item.id);
-      item.synced = true;
-      successCount++;
+      if (res.ok) {
+        const json = await res.json().catch(() => ({ status: "ok" }));
+        if (json.status === "ok") {
+          await markExpenseSynced(item.id);
+          item.synced = true;
+          successCount++;
+        } else {
+          console.error("Sheets error:", json.message);
+          failCount++;
+        }
+      } else {
+        console.error("HTTP error:", res.status);
+        failCount++;
+      }
     } catch (err) {
-      console.error("Sync error for item", item.id, err);
+      // Jika CORS error, fallback ke no-cors (asumsikan sukses)
+      console.warn("CORS fetch gagal, fallback no-cors:", err.message);
+      try {
+        await fetch(SHEETS_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            date: item.date,
+            name: item.name,
+            category: item.category,
+            amount: item.amount,
+            notes: item.notes || "",
+          }),
+        });
+        await markExpenseSynced(item.id);
+        item.synced = true;
+        successCount++;
+      } catch (err2) {
+        console.error("Sync error:", item.id, err2);
+        failCount++;
+      }
     }
   }
 
@@ -428,9 +467,36 @@ async function syncToSheets(items) {
       `☁️ ${successCount} data berhasil disinkronkan ke Google Sheets!`,
       "success",
     );
-  } else {
-    showToast("❌ Gagal menyinkronkan. Periksa koneksi internet.", "error");
   }
+  if (failCount > 0) {
+    showToast(`❌ ${failCount} data gagal disinkronkan.`, "error");
+  }
+}
+
+// Reset status synced — panggil ini jika data sudah ditandai synced
+// padahal belum benar-benar masuk ke Sheets
+function resetAllSyncStatus() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const items = req.result;
+      let count = 0;
+      items.forEach((item) => {
+        item.synced = false;
+        store.put(item);
+        count++;
+      });
+      tx.oncomplete = () => {
+        expenses.forEach((e) => (e.synced = false));
+        renderTable();
+        showToast(`🔄 ${count} data direset, siap disinkronkan ulang.`, "info");
+        resolve(count);
+      };
+    };
+    req.onerror = () => reject(req.error);
+  });
 }
 
 // ─── EXPORT CSV ───────────────────────────────────────
