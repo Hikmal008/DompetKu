@@ -3,7 +3,7 @@
    Handles: Caching, Offline Fallback, Background Sync
    ===================================================== */
 
-const CACHE_NAME = "dompetku-v1.0.2";
+const CACHE_NAME = "dompetku-v1.0.3";
 const OFFLINE_URL = "/offline.html";
 
 // Assets to cache on install
